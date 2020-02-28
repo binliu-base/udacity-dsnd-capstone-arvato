@@ -32,7 +32,7 @@ Arvato provided a couple of files for this project but as part of the terms and 
 As stated above the data for this project is not publicly available. For this reason the notebook and models provided by this repository cannot be used, but are made available to serve as a snapshot of the state of the project at the end.
 
 ## Results <a name="results"></a>
-See blog post [Chinese here]( https://segmentfault.com/a/1190000021861557) 
+See blog post (Chinese)[here]( https://segmentfault.com/a/1190000021861557) 
 
 ## Licensing, Authors, Acknowledgements<a name="licensing"></a>
 I would like to thank Udacity, Arvato Bertelsmann and collaborate company to provide such wonderful datasets for me to learn and practice my machine

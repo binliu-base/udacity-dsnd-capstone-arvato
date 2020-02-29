@@ -192,17 +192,23 @@ class EDA(object):
             elif p_stats_name == 'percent_of_nans':
                 self.feat_info['percent_of_nans'] = round(self.feat_info['n_nans']/self.data.shape[0], 2)
 
-            elif p_stats_name == 'n_distinct':
-                self.feat_info['n_distinct'] = pd.Series([self.data[c].unique().shape[0] for c in self.data.columns], index = self.data.columns)
+            elif p_stats_name == 'values':
+                self.feat_info['value_count'] = pd.Series([self.data[c].unique().shape[0] for c in self.data.columns], index = self.data.columns)
+                self.feat_info['value_min'] = self.data.min()
+                self.feat_info['value_max'] = self.data.max()
+                self.feat_info['value_mean'] = self.data.max()
+                self.feat_info['value_median'] = self.data.median()                        
 
             elif p_stats_name == 'boxplot':                    
                 v_Q1  = self.data.select_dtypes(exclude=['object']).quantile(0.25)
                 v_Q3  = self.data.select_dtypes(exclude=['object']).quantile(0.75)
-                v_IQR = v_Q3 - v_Q1
+                v_IQR = v_Q3 - v_Q1       
 
                 self.feat_info['Q1'] = v_Q1
                 self.feat_info['Q3'] = v_Q3
                 self.feat_info['IQR'] = v_IQR
+
+
             else:
                 print("Opps, wrong stats name ..... !")
                 pass    
@@ -213,9 +219,8 @@ class EDA(object):
         else:
             update_feat_stats('n_nans')
             update_feat_stats('percent_of_nans') 
-            update_feat_stats('n_distinct')   
+            update_feat_stats('values')   
             update_feat_stats('boxplot')           
-
 
     def build_feat_info(self, feats):
         ''' Createing  feat_info table
@@ -232,7 +237,12 @@ class EDA(object):
         feat_info['type'] = 'split'
         feat_info['n_nans'] = self.data[feats].isnull().sum()
         feat_info['percent_of_nans'] = round(feat_info['n_nans']/self.data.shape[0], 2)
-        feat_info['n_distinct'] = pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats)
+        feat_info['value_count'] = pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats)
+        feat_info['value_min'] = self.data[feats].min()
+        feat_info['value_max'] = self.data[feats].max()
+        feat_info['value_mean'] = self.data[feats].mean()
+        feat_info['value_median'] = self.data[feats].median()      
+
         v_Q1=  self.data[feats].select_dtypes(exclude=['object']).quantile(0.25)
         v_Q3=  self.data[feats].select_dtypes(exclude=['object']).quantile(0.75)
         v_IQR = v_Q3 - v_Q1
@@ -243,15 +253,15 @@ class EDA(object):
         
         return feat_info
 
-    def clean_outlier(self, feat_type):
+    def clean_outlier(self, feats):
         ''' Createing  outliers of the dataset
         Args: 
-            feat_type:  feature type (categorical, mixed, numeric, ordinal)
-
+            feats:  list of feature names
         Returns: None
         '''                   
 
-        def make_outlier_map():                
+        def make_outlier_map():  
+
             # numeric features
             MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR'].Q1 - 5
             MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR'].Q3 + 5
@@ -267,30 +277,28 @@ class EDA(object):
             D19_KONSUMTYP_MAX =   self.feat_info.loc['D19_KONSUMTYP'].Q1 - self.feat_info.loc['D19_KONSUMTYP'].IQR
 
             outlier_map = { 
-                            'numeric': 
-                                {
-                                'MIN_GEBAEUDEJAHR':  {'MIN': MIN_GEBAEUDEJAHR_MIN ,  'MAX': MIN_GEBAEUDEJAHR_MAX},
-                                'EINGEZOGENAM_HH_JAHR':    {'MIN': EINGEZOGENAM_HH_JAHR_MIN, 'MAX': EINGEZOGENAM_HH_JAHR_MAX},
-                                }, 
-                            'categorical':
-                                {
-                                # 'CAMEO_DEU_2015':  {'MIN': CAMEO_DEU_2015_MIN,  'MAX': CAMEO_DEU_2015_MAX},
-                                'D19_KONSUMTYP':    {'MIN': D19_KONSUMTYP_MIN, 'MAX': D19_KONSUMTYP_MAX},
-                                },
+                    'MIN_GEBAEUDEJAHR':  {'MIN': MIN_GEBAEUDEJAHR_MIN ,  'MAX': MIN_GEBAEUDEJAHR_MAX},
+                    'EINGEZOGENAM_HH_JAHR':    {'MIN': EINGEZOGENAM_HH_JAHR_MIN, 'MAX': EINGEZOGENAM_HH_JAHR_MAX},
+                    # 'CAMEO_DEU_2015':  {'MIN': CAMEO_DEU_2015_MIN,  'MAX': CAMEO_DEU_2015_MAX},
+                    'D19_KONSUMTYP':    {'MIN': D19_KONSUMTYP_MIN, 'MAX': D19_KONSUMTYP_MAX},
                     }
 
             return outlier_map
 
-        print(f'   Processing outliers for feature type: {feat_type}')
-        outlier_map = make_outlier_map()        
-        for v, lim in outlier_map[feat_type].items():                
-                print(f' Processing outliers for {v}  ...')            
-                if 'MIN' in outlier_map[feat_type][v].keys():
-                    self.data[v] = self.data[v].fillna( self.data[v].mean()).apply(lambda x: lim['MIN'] if x < lim['MIN'] else x)
-                if 'MAX' in outlier_map[feat_type][v].keys():
-                    self.data[v] = self.data[v].fillna( self.data[v].mean()).apply(lambda x: lim['MAX'] if x > lim['MAX'] else x) 
+        def remove_outliers(x):
+            lim=outlier_map[x]
+            if 'MIN' in lim.keys():
+                self.data[x] = self.data[x].fillna( self.data[x].mean()).apply(lambda k: lim['MIN'] if k < lim['MIN'] else k)
 
-    
+            if 'MAX' in lim.keys():
+                self.data[x] = self.data[x].fillna( self.data[x].mean()).apply(lambda k: lim['MAX'] if k > lim['MAX'] else k) 
+
+        outlier_map = make_outlier_map()                
+
+        for x in feats:
+            print(f'Cleaning outliers for {x}  ...')            
+            remove_outliers(x)
+
     def data_pipeline(self, thr_row_missing = 0.25, clean_rows =True ): 
         ''' All in one, cleaning data
         Args: 
@@ -352,9 +360,9 @@ class EDA(object):
 
         self.collecting_stats()
 
-        print(f'Step 6: Handling outliers ...')        
-        self.clean_outlier('numeric')
-        self.clean_outlier('categorical')        
+        print(f'Step 6: Handling outliers ...')  
+        outlier_feats = ['MIN_GEBAEUDEJAHR', 'EINGEZOGENAM_HH_JAHR']      
+        self.clean_outlier(outlier_feats)
 
         # Estimating NaN values with median
         print(f'Step 7: Estimating NaN values with median ...')                
@@ -363,3 +371,5 @@ class EDA(object):
 
         print(f'Step 8: Feature scaling ...')                        
         self.data_scaled = StandardScaler().fit_transform(self.data_imputed)
+
+        print(f'Data Cleaning done !')                        

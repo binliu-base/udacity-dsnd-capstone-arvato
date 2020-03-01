@@ -8,40 +8,53 @@ import helper_functions as h
 
 class EDA(object):
 
-    def __init__(self, data, feats_info, label = 'Azdias'):
+    def __init__(self, data, feat_info, label = 'Azdias'):
 
         self.data = data
-        self.feat_info = feats_info.copy()
+        self.feat_info = None
         self.pca = None
         self.X_pca = None
         self.label = label
+        self._preprocess(feat_info)
 
     def __repr__(self):        
         return self.label
+    
+    def _preprocess(self, feat_info):
+        
+        # type_s = feat_info.type.copy()
+        # unknown_s = feat_info.unknown.copy()
+        n_nans_s = self.data.isnull().sum()
+        percent_of_nans_s = round(n_nans_s/self.data.shape[0], 2)
+
+        data ={
+            'n_nans' : n_nans_s,
+            'percent_of_nans' : percent_of_nans_s
+        }
+
+        self.feat_info = pd.concat([feat_info.copy(), pd.DataFrame(data), self.data.describe().T],  axis=1)
+
 
     def missing2nan(self):  
         ''' Converts all the unknows values in the dataset to NaN.
         Args: None
         Returns: None
-
         '''
-
         n_nans_bef= self.data.isnull().sum().sum()
 
-        for col in self.data.columns:
+        # for col in self.data.columns:
+        for col in self.feat_info['unknown'].dropna().index:
             unknows = ast.literal_eval(self.feat_info.loc[col]['unknown'])
             self.data[col] = self.data[col].mask(self.data[col].isin(unknows), other=np.nan)
 
-        self.feat_info['n_nans'] = self.data.isnull().sum()
-        self.feat_info['percent_of_nans'] = round(self.feat_info['n_nans']/self.data.shape[0], 2)
-
         n_nans_aft = self.data.isnull().sum().sum()    
-        change = (n_nans_aft - n_nans_bef)/n_nans_bef *100
+        change = (n_nans_aft - n_nans_bef)/n_nans_bef *100            
 
         print(f'Number of missing values in {self.label}:')
         print(f'Before converstion is {n_nans_bef}')
         print(f'Ater converstion IS {n_nans_aft}')
         print('Increase in missing values: {0:.2f} % '.format(change))
+
 
     def re_encoding(self, p_feat_name):
         ''' Re-encoding a feature
@@ -177,81 +190,43 @@ class EDA(object):
         func_dict[p_feat_name]()        
 
 
-    def collecting_stats(self, *args):
+    def build_split_feat_info(self, split_feats):
+        ''' Createing  feat_info table
+        Args: 
+            split_feats:  list of split features
+        Returns: a feat_info table of split features       
+        '''                   
+        
+        type_s = pd.Series('split', index= split_feats)
+        n_nans_s= self.data[split_feats].isnull().sum()
+        percent_of_nans_s = round(n_nans_s/self.data[split_feats].shape[0], 2)
+
+        data ={
+            'type': type_s,
+            'unknown' : np.NaN,
+            'n_nans' : n_nans_s,
+            'percent_of_nans' : percent_of_nans_s
+        }        
+       
+        return  pd.concat([pd.DataFrame(data), self.data[split_feats].describe().T], axis=1)
+
+    def update_stats(self):
         ''' Collecting statistical information of the dataset and update the feat_info table
         Args: 
             args:  list of statistical metrics
         Returns: None
         '''           
+        type_s = self.feat_info.type
+        n_nans_s = self.data.isnull().sum()
+        percent_of_nans_s = round(n_nans_s/self.data.shape[0], 2)
 
-        def update_feat_stats(p_stats_name):    
-            
-            if p_stats_name == 'n_nans': 
-                self.feat_info['n_nans'] = self.data.isnull().sum()
+        data ={
+            'type': type_s,
+            'n_nans' : n_nans_s,
+            'percent_of_nans' : percent_of_nans_s
+        }
 
-            elif p_stats_name == 'percent_of_nans':
-                self.feat_info['percent_of_nans'] = round(self.feat_info['n_nans']/self.data.shape[0], 2)
-
-            elif p_stats_name == 'values':
-                self.feat_info['value_count'] = pd.Series([self.data[c].unique().shape[0] for c in self.data.columns], index = self.data.columns)
-                self.feat_info['value_min'] = self.data.min()
-                self.feat_info['value_max'] = self.data.max()
-                self.feat_info['value_mean'] = self.data.max()
-                self.feat_info['value_median'] = self.data.median()                        
-
-            elif p_stats_name == 'boxplot':                    
-                v_Q1  = self.data.select_dtypes(exclude=['object']).quantile(0.25)
-                v_Q3  = self.data.select_dtypes(exclude=['object']).quantile(0.75)
-                v_IQR = v_Q3 - v_Q1       
-
-                self.feat_info['Q1'] = v_Q1
-                self.feat_info['Q3'] = v_Q3
-                self.feat_info['IQR'] = v_IQR
-
-
-            else:
-                print("Opps, wrong stats name ..... !")
-                pass    
-        
-        if len(args) > 0:
-            for x in args:
-                update_feat_stats(x)
-        else:
-            update_feat_stats('n_nans')
-            update_feat_stats('percent_of_nans') 
-            update_feat_stats('values')   
-            update_feat_stats('boxplot')           
-
-    def build_feat_info(self, feats):
-        ''' Createing  feat_info table
-        Args: 
-            feats:  list of feature names
-        Returns: feat_info table        
-        '''                   
-
-        feat_info = pd.DataFrame(columns = self.feat_info.columns, index = feats)
-        feat_info.reset_index(inplace = True)
-        feat_info.rename(columns = {'index' :'feat'}, inplace = True)
-        feat_info.set_index('feat', inplace = True)        
-        
-        feat_info['type'] = 'split'
-        feat_info['n_nans'] = self.data[feats].isnull().sum()
-        feat_info['percent_of_nans'] = round(feat_info['n_nans']/self.data.shape[0], 2)
-        feat_info['value_count'] = pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats)
-        feat_info['value_min'] = self.data[feats].min()
-        feat_info['value_max'] = self.data[feats].max()
-        feat_info['value_mean'] = self.data[feats].mean()
-        feat_info['value_median'] = self.data[feats].median()      
-
-        v_Q1=  self.data[feats].select_dtypes(exclude=['object']).quantile(0.25)
-        v_Q3=  self.data[feats].select_dtypes(exclude=['object']).quantile(0.75)
-        v_IQR = v_Q3 - v_Q1
-
-        feat_info['Q1'] = v_Q1
-        feat_info['Q3'] = v_Q3
-        feat_info['IQR'] = v_IQR
-        
-        return feat_info
+        self.feat_info = pd.concat([pd.DataFrame(data), self.data.describe().T],  axis=1)   
 
     def clean_outlier(self, feats):
         ''' Createing  outliers of the dataset
@@ -263,18 +238,18 @@ class EDA(object):
         def make_outlier_map():  
 
             # numeric features
-            MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR'].Q1 - 5
-            MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR'].Q3 + 5
+            MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR']['25%'] - 5
+            MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR']['75%'] + 5
 
-            EINGEZOGENAM_HH_JAHR_MIN = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].Q1 - self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].IQR
-            EINGEZOGENAM_HH_JAHR_MAX = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].Q3 + self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].IQR
+            EINGEZOGENAM_HH_JAHR_MIN = self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'] - (self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] - self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'])
+            EINGEZOGENAM_HH_JAHR_MAX = self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] + (self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] - self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'])
 
             # categorical features
             # CAMEO_DEU_2015_MIN = self.feat_info.loc['CAMEO_DEU_2015'].Q1 - self.feat_info.loc['CAMEO_DEU_2015'].IQR
             # CAMEO_DEU_2015_MAX = self.feat_info.loc['CAMEO_DEU_2015'].Q3 + self.feat_info.loc['CAMEO_DEU_2015'].IQR            
 
-            D19_KONSUMTYP_MIN =  self.feat_info.loc['D19_KONSUMTYP'].Q1 - self.feat_info.loc['D19_KONSUMTYP'].IQR
-            D19_KONSUMTYP_MAX =   self.feat_info.loc['D19_KONSUMTYP'].Q1 - self.feat_info.loc['D19_KONSUMTYP'].IQR
+            D19_KONSUMTYP_MIN =  self.feat_info.loc['D19_KONSUMTYP']['25%'] - (self.feat_info.loc['D19_KONSUMTYP']['75%'] - self.feat_info.loc['D19_KONSUMTYP']['25%'])
+            D19_KONSUMTYP_MAX =  self.feat_info.loc['D19_KONSUMTYP']['75%'] + (self.feat_info.loc['D19_KONSUMTYP']['75%'] - self.feat_info.loc['D19_KONSUMTYP']['25%']) 
 
             outlier_map = { 
                     'MIN_GEBAEUDEJAHR':  {'MIN': MIN_GEBAEUDEJAHR_MIN ,  'MAX': MIN_GEBAEUDEJAHR_MAX},
@@ -355,10 +330,11 @@ class EDA(object):
                          'LP_LEBENSPHASE_GROB_SPLIT_INCOME',
                          'PRAEGENDE_JUGENDJAHRE_SPLIT_DECADE',
                          'PRAEGENDE_JUGENDJAHRE_SPLIT_MOVEMENT']
-        feat_info_split = self.build_feat_info(feats_splited)   
+
+        feat_info_split = self.build_split_feat_info(feats_splited)   
         self.feat_info= pd.concat([self.feat_info, feat_info_split], sort = False)
 
-        self.collecting_stats()
+        self.update_stats()
 
         print(f'Step 6: Handling outliers ...')  
         outlier_feats = ['MIN_GEBAEUDEJAHR', 'EINGEZOGENAM_HH_JAHR']      
@@ -367,9 +343,9 @@ class EDA(object):
         # Estimating NaN values with median
         print(f'Step 7: Estimating NaN values with median ...')                
         imputer = Imputer(strategy='median')
-        self.data_imputed = pd.DataFrame(imputer.fit_transform(self.data))
+        self.data_imputed = pd.DataFrame(imputer.fit_transform(self.data),  columns=self.data.columns)
 
         print(f'Step 8: Feature scaling ...')                        
-        self.data_scaled = StandardScaler().fit_transform(self.data_imputed)
+        self.data_scaled = pd.DataFrame(StandardScaler().fit_transform(self.data_imputed), columns=self.data.columns)
 
         print(f'Data Cleaning done !')                        

@@ -5,8 +5,8 @@ import pickle
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-
 from sklearn.preprocessing import Imputer, StandardScaler
+from sklearn.model_selection import GridSearchCV
 
 RANDOM_STATE = 2020
 
@@ -305,6 +305,24 @@ def list_component(eda, top_n_comps):
                         'Weights':eda.pca.components_[top_n_comps]}).sort_values('Weights', axis=0, ascending=False).values.tolist()
 
     return listing[:5]+['^^^HEAD','TAILvvv']+listing[-5:]  
+
+
+def build_roc_auc(model_dict, param_grid, X_train, y_train):
+    '''
+    Function for calculating auc and roc
+    Args: 
+        model_dict - dict of model map
+        param_grid - dict or list of dictionaries      
+        X_train - the training data
+        y_train - the training response values (must be 0 or 1)
+    Returns: None
+    prints the roc auc score
+    '''
+    
+    for k, clf in model_dict.items():
+            grid = GridSearchCV(estimator=clf, param_grid=param_grid, scoring='roc_auc', cv=10)
+            grid.fit(X_train, y_train)
+            print(f'Model: {k},  Best ROC AUC score:  {grid.best_score_}')           
 
 
 def save_runs(run_name, model, model_type, space, trials, best, n_iter, preds_test):

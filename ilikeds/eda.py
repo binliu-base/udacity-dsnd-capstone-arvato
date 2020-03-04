@@ -43,9 +43,11 @@ class EDA(object):
         n_nans_bef= self.data.isnull().sum().sum()
 
         # for col in self.data.columns:
-        for col in self.feat_info['unknown'].dropna().index:
-            unknows = ast.literal_eval(self.feat_info.loc[col]['unknown'])
-            self.data[col] = self.data[col].mask(self.data[col].isin(unknows), other=np.nan)
+        # for col in self.feat_info['unknown'].dropna().index:
+        for col in self.data.columns:
+            if col in self.feat_info['unknown'].dropna().index:
+                unknows = ast.literal_eval(self.feat_info.loc[col]['unknown'])
+                self.data[col] = self.data[col].mask(self.data[col].isin(unknows), other=np.nan)
 
         n_nans_aft = self.data.isnull().sum().sum()    
         change = (n_nans_aft - n_nans_bef)/n_nans_bef *100            
@@ -84,15 +86,16 @@ class EDA(object):
             self.data.CAMEO_DEU_2015.replace({'XX': -1}, inplace =True)
             codes, uniques = pd.factorize(self.data.CAMEO_DEU_2015.value_counts().index.tolist())
             mapping_CAMEO_DEU_2015 = dict(zip(uniques,codes))
-            self.data.CAMEO_DEU_2015 = self.data.CAMEO_DEU_2015.map(mapping_CAMEO_DEU_2015).astype('float64')                                    
-                        
+            self.data.CAMEO_DEU_2015 = self.data.CAMEO_DEU_2015.map(mapping_CAMEO_DEU_2015).astype('float64')    
+
         func_dict= {
             'OST_WEST_KZ': re_encoding_OST_WEST_KZ,
             'CAMEO_DEUG_2015': re_encoding_CAMEO_DEUG_2015,
             'CAMEO_INTL_2015': re_encoding_CAMEO_INTL_2015,   
+            'EINGEFUEGT_AM': re_encoding_EINGEFUEGT_AM,            
             # 'CAMEO_DEU_2015': re_encoding_CAMEO_DEU_2015,                               
             # 'LP_LEBENSPHASE_GROB': re_encoding_LP_LEBENSPHASE_GROB,                                                   
-            'EINGEFUEGT_AM': re_encoding_EINGEFUEGT_AM,            
+
         } 
 
         func_dict[p_feat_name]()

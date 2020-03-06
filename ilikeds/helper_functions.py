@@ -222,8 +222,8 @@ def scree_plot(eda):
     plt.vlines(x=99, ymin=0, ymax=cumvals[99], color='red', linestyles='-',zorder=4)
 
     # 200
-    plt.hlines(y=cumvals[199], xmin=0, xmax=199, color='red', linestyles='-',zorder=5)
-    plt.vlines(x=199, ymin=0, ymax=cumvals[199], color='red', linestyles='-',zorder=6)    
+    plt.hlines(y=cumvals[num_components-1], xmin=0, xmax=num_components-1, color='red', linestyles='-',zorder=5)
+    plt.vlines(x=num_components-1, ymin=0, ymax=cumvals[num_components-1], color='red', linestyles='-',zorder=6)    
     
     plt.title(f'PCA Analysis ({eda}))')   
 

@@ -15,25 +15,39 @@ class EDA(object):
         self.pca = None
         self.X_pca = None
         self.label = label
-        self._preprocess(feat_info)
+        self.feat_info = self.build_feat_info(feat_info)
 
     def __repr__(self):        
         return self.label
     
     def _preprocess(self, feat_info):
+        self.build_feat_info(feat_info)
         
-        # type_s = feat_info.type.copy()
-        # unknown_s = feat_info.unknown.copy()
-        n_nans_s = self.data.isnull().sum()
-        percent_of_nans_s = round(n_nans_s/self.data.shape[0], 2)
 
-        data ={
-            'n_nans' : n_nans_s,
-            'percent_of_nans' : percent_of_nans_s
-        }
+    def build_feat_info(self, feat_info):
 
-        self.feat_info = pd.concat([feat_info.copy(), pd.DataFrame(data), self.data.describe().T],  axis=1)
+        if 'is_drop' not in feat_info.columns:            
+            feat_info['is_drop'] = 0
 
+        feats = feat_info.index.tolist()
+        stats_df = self.data[feats].describe()
+        
+        return pd.DataFrame({
+            'type': feat_info.type,
+            'unknow': feat_info.unknow,    
+            'is_drop': feat_info.is_drop,    
+            'n_nans' : self.data[feats].isnull().sum(),
+            'percent_of_nans' :  round(self.data[feats].isnull().sum()/self.data[feats].shape[0], 3),
+            'value_distinct': pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats),
+            'value_count': stats_df.loc['count'],
+            'value_mean': stats_df.loc['mean'],
+            'value_std': stats_df.loc['std'],
+            'value_min': stats_df.loc['min'],
+            'value_max': stats_df.loc['max'],
+            'value_Q1': stats_df.loc['25%'],
+            'value_Q3': stats_df.loc['75%'],                        
+            'value_IRQ': stats_df.loc['75%'] - stats_df.loc['25%'],                                    
+        }, index = feat_info.index)
 
     def missing2nan(self):  
         ''' Converts all the unknows values in the dataset to NaN.
@@ -43,10 +57,10 @@ class EDA(object):
         n_nans_bef= self.data.isnull().sum().sum()
 
         # for col in self.data.columns:
-        # for col in self.feat_info['unknown'].dropna().index:
+        # for col in self.feat_info['unknow'].dropna().index:
         for col in self.data.columns:
-            if col in self.feat_info['unknown'].dropna().index:
-                unknows = ast.literal_eval(self.feat_info.loc[col]['unknown'])
+            if col in self.feat_info['unknow'].dropna().index:
+                unknows = ast.literal_eval(self.feat_info.loc[col]['unknow'])
                 self.data[col] = self.data[col].mask(self.data[col].isin(unknows), other=np.nan)
 
         n_nans_aft = self.data.isnull().sum().sum()    
@@ -142,7 +156,6 @@ class EDA(object):
 
         self.data['CAMEO_INTL_2015_SPLIT_WEALTH'] = self.data['CAMEO_INTL_2015'].apply(lambda x: np.floor(pd.to_numeric(x)/10))        
         self.data['CAMEO_INTL_2015_SPLIT_LIFE_STAGE'] = self.data['CAMEO_INTL_2015'].apply(lambda x: pd.to_numeric(x)%10)   
-
         self.data.drop(columns = ['CAMEO_INTL_2015'], axis=1, inplace=True)                               
 
     def split_LP_LEBENSPHASE_GROB(self):
@@ -174,10 +187,13 @@ class EDA(object):
         self.data['LP_LEBENSPHASE_GROB_SPLIT_AGE'] = self.data['LP_LEBENSPHASE_GROB'].map(map_AGE).astype(float)        
         self.data['LP_LEBENSPHASE_GROB_SPLIT_INCOME'] = self.data['LP_LEBENSPHASE_GROB'].map(map_INCOME).astype(float)  
 
-        self.data.drop(columns = ['LP_LEBENSPHASE_GROB'], axis=1, inplace=True)                    
+        self.data.drop(columns = ['LP_LEBENSPHASE_GROB'], axis=1, inplace=True)    
+    
+    # def split_CAMEO_DEU_2015(self):
+    #     pass
 
 
-    def process_mixed_feat(self, p_feat_name):
+    def split_mixed_feat(self, p_feat_name):
         ''' Handling mixed type features
         Args: 
             p_feat_name:  the mixed feature name
@@ -189,29 +205,10 @@ class EDA(object):
             'PRAEGENDE_JUGENDJAHRE': self.split_PRAEGENDE_JUGENDJAHRE,
             'CAMEO_INTL_2015': self.split_CAMEO_INTL_2015,
             'LP_LEBENSPHASE_GROB': self.split_LP_LEBENSPHASE_GROB,
+            # 'CAMEO_DEU_2015': self.split_CAMEO_DEU_2015,
         }         
         func_dict[p_feat_name]()        
-
-
-    def build_split_feat_info(self, split_feats):
-        ''' Createing  feat_info table
-        Args: 
-            split_feats:  list of split features
-        Returns: a feat_info table of split features       
-        '''                   
-        
-        type_s = pd.Series('split', index= split_feats)
-        n_nans_s= self.data[split_feats].isnull().sum()
-        percent_of_nans_s = round(n_nans_s/self.data[split_feats].shape[0], 2)
-
-        data ={
-            'type': type_s,
-            'unknown' : np.NaN,
-            'n_nans' : n_nans_s,
-            'percent_of_nans' : percent_of_nans_s
-        }        
-       
-        return  pd.concat([pd.DataFrame(data), self.data[split_feats].describe().T], axis=1)
+   
 
     def update_stats(self):
         ''' Collecting statistical information of the dataset and update the feat_info table
@@ -219,17 +216,29 @@ class EDA(object):
             args:  list of statistical metrics
         Returns: None
         '''           
-        type_s = self.feat_info.type
-        n_nans_s = self.data.isnull().sum()
-        percent_of_nans_s = round(n_nans_s/self.data.shape[0], 2)
+        feats = self.feat_info.loc[self.feat_info.is_drop == 0].index
 
-        data ={
-            'type': type_s,
-            'n_nans' : n_nans_s,
-            'percent_of_nans' : percent_of_nans_s
-        }
+        stats_df = self.data[feats].describe()
 
-        self.feat_info = pd.concat([pd.DataFrame(data), self.data.describe().T],  axis=1)   
+        feat_info = pd.DataFrame({
+            'type': self.feat_info.loc[feats].type,
+            'unknow': self.feat_info.loc[feats].unknow,    
+            'is_drop': self.feat_info.loc[feats].is_drop.astype(int),    
+            'n_nans' : self.data[feats].isnull().sum().astype(int),
+            'percent_of_nans' : round(self.data[feats].isnull().sum()/self.data[feats].shape[0], 3).astype(float),
+            'value_distinct': pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats).astype(int),
+            'value_count': stats_df.loc['count'].astype(int),
+            'value_mean': stats_df.loc['mean'],
+            'value_std': stats_df.loc['std'],
+            'value_min': stats_df.loc['min'],
+            'value_max': stats_df.loc['max'],
+            'value_Q1': stats_df.loc['25%'],
+            'value_Q3': stats_df.loc['75%'],                        
+            'value_IRQ': stats_df.loc['75%'] - stats_df.loc['25%'],                                    
+                                   
+        }, index = feats)  
+
+        self.feat_info.loc[feats] = feat_info
 
     def clean_outlier(self, feats):
         ''' Createing  outliers of the dataset
@@ -293,8 +302,8 @@ class EDA(object):
         self.data.drop(columns= feats_todrop, axis = 1,inplace =True)
         print(f'After cleaning, Number of columns is {self.data.shape[1]} in {self.label} ')        
 
-        #  Convert missing and unknown values
-        print(f'Step 2: Convert missing and unknown values ...')
+        #  Convert missing and unknow values
+        print(f'Step 2: Convert missing and unknow values ...')
         self.missing2nan()  
 
         # Delete the rows with more NaN values
@@ -324,7 +333,7 @@ class EDA(object):
         mixed_feats = ['CAMEO_INTL_2015', 'LP_LEBENSPHASE_GROB', 'PRAEGENDE_JUGENDJAHRE']
         for x in mixed_feats:
             print(f'   Spliting: {x} ...')                           
-            self.process_mixed_feat(x)
+            self.split_mixed_feat(x)
 
         feats_splited = ['CAMEO_INTL_2015_SPLIT_WEALTH', 
                          'CAMEO_INTL_2015_SPLIT_LIFE_STAGE',

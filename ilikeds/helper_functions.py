@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 import seaborn as sns
 import pickle
 import matplotlib.pyplot as plt
@@ -9,6 +10,16 @@ from sklearn.preprocessing import Imputer, StandardScaler
 from sklearn.model_selection import GridSearchCV
 
 RANDOM_STATE = 2020
+
+action_dic ={
+    1:  'drop: high missing values',
+    2:  'drop: duplicated',
+    3:  're-encoding: mapping',    
+    4:  're-encoding: logarithmic scaling',        
+    5:  'split',
+    6:  'drop: same quartile distribution',    
+    7:  'remove-outlier',        
+}
 
 def split_dataset(df, threshold=0.25):
     """ Splits data into two subsets based on the missing values per row.
@@ -68,27 +79,32 @@ def check_features(eda, feat_type='categorical'):
             print(f + ' was eliminated already')
 
 
-def plot_boxplot(data, feats, n_cols= 3, figsize= (25, 25)):
+def plot_boxplot(data, feats, n_cols= 3, figsize= (20,  6)):
     """ Draw a box plot to show distributions with respect to features.
 
     Args:
     - data:  Dataset for plotting
     - feats: a list of features
-    - n_cols: Number of features displayed per line
+    - n_cols: Number of features displayed per row
     - figsize: Size of the figure
 
     Returns: None
     """
+    n_rows = math.ceil(len(feats)/n_cols)
+    fig = plt.figure(figsize= figsize) 
+    count = 0
 
-    fig = plt.figure(figsize= figsize)        
-    n_rows = int(len(feats)/n_cols) + 1
-
-    for i in range(n_rows -1):
+    for i in range(n_rows):
         for j in range(n_cols):
-            fig.add_subplot(n_rows , n_cols, i*n_cols + j + 1)                     
-            f = feats[i*n_cols + j]
+            f = feats[i*n_cols + j]            
+            fig.add_subplot(n_rows , n_cols, i*n_cols + j + 1)                          
             sns.boxplot(x = data[f] )    
-            plt.title(f'Quartile distribution for feature: {f}')  
+            plt.title(f'Quartile distribution for : {f}')                            
+            count+=1
+            if count == len(feats):
+                break
+
+    plt.subplots_adjust(hspace= 0.5)
 
 
 def do_pca(eda, n_components):
@@ -166,7 +182,7 @@ def plot_feats_comparison(data1, data2, feats, fig_height=4, fig_aspect=0.8):
         except TypeError as e:
             print(x)
 
-    n_rows = int(len(feats)/5) + 1
+    n_rows = math.ceil(len(feats)/5) 
                 
     for i in range(n_rows):
         if i < n_rows -1:

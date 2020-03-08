@@ -29,6 +29,9 @@ class EDA(object):
         if 'is_drop' not in feat_info.columns:            
             feat_info['is_drop'] = 0
 
+        if 'action' not in feat_info.columns:            
+            feat_info['action'] = 0
+
         feats = feat_info.index.tolist()
         stats_df = self.data[feats].describe()
         
@@ -36,6 +39,7 @@ class EDA(object):
             'type': feat_info.type,
             'unknow': feat_info.unknow,    
             'is_drop': feat_info.is_drop,    
+            'action': feat_info.action,                
             'n_nans' : self.data[feats].isnull().sum(),
             'percent_of_nans' :  round(self.data[feats].isnull().sum()/self.data[feats].shape[0], 3),
             'value_distinct': pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats),
@@ -82,38 +86,36 @@ class EDA(object):
 
         def re_encoding_OST_WEST_KZ():
             self.data['OST_WEST_KZ'] = self.data['OST_WEST_KZ'].map({'W': 1, 'O': 0})
+            # self.feat_info.loc['OST_WEST_KZ','action'] = h.action_dic[3]              
             
         def re_encoding_CAMEO_DEUG_2015():
             self.data['CAMEO_DEUG_2015'].replace({'X': np.nan}, inplace= True)
             self.data['CAMEO_DEUG_2015'] = self.data['CAMEO_DEUG_2015'].astype('float64')
+            # self.feat_info.loc['CAMEO_DEUG_2015','action'] = h.action_dic[3]                          
 
         def re_encoding_CAMEO_INTL_2015():
             self.data['CAMEO_INTL_2015'].replace({'XX': np.nan}, inplace= True)          
             self.data['CAMEO_INTL_2015'] = self.data['CAMEO_INTL_2015'].astype('float64')   
-
-        def re_encoding_EINGEFUEGT_AM():
-            self.data['EINGEFUEGT_AM'] = pd.to_datetime(self.data['EINGEFUEGT_AM'])
-            h.split_date(self.data, 'EINGEFUEGT_AM')
-            self.data.drop(columns = 'EINGEFUEGT_AM', inplace = True)     
+            # self.feat_info.loc[CAMEO_INTL_2015,'action'] = h.action_dic[3]                          
 
         def re_encoding_CAMEO_DEU_2015():
             self.data.CAMEO_DEU_2015.replace({'XX': -1}, inplace =True)
             codes, uniques = pd.factorize(self.data.CAMEO_DEU_2015.value_counts().index.tolist())
             mapping_CAMEO_DEU_2015 = dict(zip(uniques,codes))
             self.data.CAMEO_DEU_2015 = self.data.CAMEO_DEU_2015.map(mapping_CAMEO_DEU_2015).astype('float64')    
+            # self.feat_info.loc['CAMEO_DEUG_2015','action'] = h.action_dic[3]                          
 
         func_dict= {
             'OST_WEST_KZ': re_encoding_OST_WEST_KZ,
             'CAMEO_DEUG_2015': re_encoding_CAMEO_DEUG_2015,
             'CAMEO_INTL_2015': re_encoding_CAMEO_INTL_2015,   
-            'EINGEFUEGT_AM': re_encoding_EINGEFUEGT_AM,            
             # 'CAMEO_DEU_2015': re_encoding_CAMEO_DEU_2015,                               
             # 'LP_LEBENSPHASE_GROB': re_encoding_LP_LEBENSPHASE_GROB,                                                   
 
         } 
 
         func_dict[p_feat_name]()
-
+        self.feat_info.loc[p_feat_name,'action'] = h.action_dic[3]  
 
     def split_PRAEGENDE_JUGENDJAHRE(self):
 
@@ -149,14 +151,10 @@ class EDA(object):
         self.data['PRAEGENDE_JUGENDJAHRE_SPLIT_DECADE'] = self.data['PRAEGENDE_JUGENDJAHRE'].map(map_DECADE).astype(float)
         self.data['PRAEGENDE_JUGENDJAHRE_SPLIT_MOVEMENT'] = self.data['PRAEGENDE_JUGENDJAHRE'].apply(lambda x: convert_pj_to_move(x))
 
-        # drop PRAEGENDE_JUGENDJAHRE
-        self.data.drop('PRAEGENDE_JUGENDJAHRE', axis=1, inplace=True)            
-
     def split_CAMEO_INTL_2015(self):
 
         self.data['CAMEO_INTL_2015_SPLIT_WEALTH'] = self.data['CAMEO_INTL_2015'].apply(lambda x: np.floor(pd.to_numeric(x)/10))        
         self.data['CAMEO_INTL_2015_SPLIT_LIFE_STAGE'] = self.data['CAMEO_INTL_2015'].apply(lambda x: pd.to_numeric(x)%10)   
-        self.data.drop(columns = ['CAMEO_INTL_2015'], axis=1, inplace=True)                               
 
     def split_LP_LEBENSPHASE_GROB(self):
 
@@ -187,11 +185,9 @@ class EDA(object):
         self.data['LP_LEBENSPHASE_GROB_SPLIT_AGE'] = self.data['LP_LEBENSPHASE_GROB'].map(map_AGE).astype(float)        
         self.data['LP_LEBENSPHASE_GROB_SPLIT_INCOME'] = self.data['LP_LEBENSPHASE_GROB'].map(map_INCOME).astype(float)  
 
-        self.data.drop(columns = ['LP_LEBENSPHASE_GROB'], axis=1, inplace=True)    
-    
-    # def split_CAMEO_DEU_2015(self):
-    #     pass
-
+    def split_EINGEFUEGT_AM(self):
+        self.data['EINGEFUEGT_AM'] = pd.to_datetime(self.data['EINGEFUEGT_AM'])
+        h.split_date(self.data, 'EINGEFUEGT_AM')    
 
     def split_mixed_feat(self, p_feat_name):
         ''' Handling mixed type features
@@ -205,9 +201,13 @@ class EDA(object):
             'PRAEGENDE_JUGENDJAHRE': self.split_PRAEGENDE_JUGENDJAHRE,
             'CAMEO_INTL_2015': self.split_CAMEO_INTL_2015,
             'LP_LEBENSPHASE_GROB': self.split_LP_LEBENSPHASE_GROB,
+            'EINGEFUEGT_AM': self.split_EINGEFUEGT_AM,                        
             # 'CAMEO_DEU_2015': self.split_CAMEO_DEU_2015,
-        }         
-        func_dict[p_feat_name]()        
+        }     
+
+        func_dict[p_feat_name]() 
+        self.feat_info.loc[p_feat_name ,['is_drop', 'action']] = 1, h.action_dic[5]   
+        self.data.drop(p_feat_name, axis=1, inplace=True)                        
    
 
     def update_stats(self):
@@ -224,6 +224,7 @@ class EDA(object):
             'type': self.feat_info.loc[feats].type,
             'unknow': self.feat_info.loc[feats].unknow,    
             'is_drop': self.feat_info.loc[feats].is_drop.astype(int),    
+            'action': self.feat_info.action,                 
             'n_nans' : self.data[feats].isnull().sum().astype(int),
             'percent_of_nans' : round(self.data[feats].isnull().sum()/self.data[feats].shape[0], 3).astype(float),
             'value_distinct': pd.Series([self.data[c].unique().shape[0] for c in feats], index = feats).astype(int),
@@ -250,22 +251,34 @@ class EDA(object):
         def make_outlier_map():  
 
             # numeric features
-            MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR']['25%'] - 5
-            MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR']['75%'] + 5
+            MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR'].value_Q1 - 5
+            MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR'].value_Q3 + 5
 
-            EINGEZOGENAM_HH_JAHR_MIN = self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'] - (self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] - self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'])
-            EINGEZOGENAM_HH_JAHR_MAX = self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] + (self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['75%'] - self.feat_info.loc['EINGEZOGENAM_HH_JAHR']['25%'])
+            EINGEZOGENAM_HH_JAHR_MIN = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_Q1 - self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_IRQ
+            EINGEZOGENAM_HH_JAHR_MAX = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_Q3 + self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_IRQ
+
+            ANZ_HAUSHALTE_AKTIV_MIN = self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_Q1 - self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_IRQ
+            ANZ_HAUSHALTE_AKTIV_MAX = self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_Q3 + self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_IRQ    
+
+            ANZ_PERSONEN_MIN = self.feat_info.loc['ANZ_PERSONEN'].value_Q1 - self.feat_info.loc['ANZ_PERSONEN'].value_IRQ
+            ANZ_PERSONEN_MAX = self.feat_info.loc['ANZ_PERSONEN'].value_Q3 + self.feat_info.loc['ANZ_PERSONEN'].value_IRQ     
+
+            KBA13_ANZAHL_PKW_MIN = self.feat_info.loc['KBA13_ANZAHL_PKW'].value_Q1 - self.feat_info.loc['KBA13_ANZAHL_PKW'].value_IRQ
+            KBA13_ANZAHL_PKW_MAX = self.feat_info.loc['KBA13_ANZAHL_PKW'].value_Q3 + self.feat_info.loc['KBA13_ANZAHL_PKW'].value_IRQ                           
 
             # categorical features
             # CAMEO_DEU_2015_MIN = self.feat_info.loc['CAMEO_DEU_2015'].Q1 - self.feat_info.loc['CAMEO_DEU_2015'].IQR
             # CAMEO_DEU_2015_MAX = self.feat_info.loc['CAMEO_DEU_2015'].Q3 + self.feat_info.loc['CAMEO_DEU_2015'].IQR            
 
-            D19_KONSUMTYP_MIN =  self.feat_info.loc['D19_KONSUMTYP']['25%'] - (self.feat_info.loc['D19_KONSUMTYP']['75%'] - self.feat_info.loc['D19_KONSUMTYP']['25%'])
-            D19_KONSUMTYP_MAX =  self.feat_info.loc['D19_KONSUMTYP']['75%'] + (self.feat_info.loc['D19_KONSUMTYP']['75%'] - self.feat_info.loc['D19_KONSUMTYP']['25%']) 
+            D19_KONSUMTYP_MIN =  self.feat_info.loc['D19_KONSUMTYP'].value_Q1 - self.feat_info.loc['D19_KONSUMTYP'].value_IRQ
+            D19_KONSUMTYP_MAX =  self.feat_info.loc['D19_KONSUMTYP'].value_Q3 + self.feat_info.loc['D19_KONSUMTYP'].value_IRQ
 
             outlier_map = { 
                     'MIN_GEBAEUDEJAHR':  {'MIN': MIN_GEBAEUDEJAHR_MIN ,  'MAX': MIN_GEBAEUDEJAHR_MAX},
                     'EINGEZOGENAM_HH_JAHR':    {'MIN': EINGEZOGENAM_HH_JAHR_MIN, 'MAX': EINGEZOGENAM_HH_JAHR_MAX},
+                    'ANZ_HAUSHALTE_AKTIV':    {'MIN': ANZ_HAUSHALTE_AKTIV_MIN, 'MAX': ANZ_HAUSHALTE_AKTIV_MAX},                    
+                    'ANZ_PERSONEN':    {'MIN': ANZ_PERSONEN_MIN, 'MAX': ANZ_PERSONEN_MAX},                                        
+                    'KBA13_ANZAHL_PKW':    {'MIN': KBA13_ANZAHL_PKW_MIN, 'MAX': KBA13_ANZAHL_PKW_MAX},                                                            
                     # 'CAMEO_DEU_2015':  {'MIN': CAMEO_DEU_2015_MIN,  'MAX': CAMEO_DEU_2015_MAX},
                     'D19_KONSUMTYP':    {'MIN': D19_KONSUMTYP_MIN, 'MAX': D19_KONSUMTYP_MAX},
                     }
@@ -285,6 +298,8 @@ class EDA(object):
         for x in feats:
             print(f'Cleaning outliers for {x}  ...')            
             remove_outliers(x)
+
+        self.feat_info.loc[x ,'action'] = h.action_dic[7]   
 
     def data_pipeline(self, thr_row_missing = 0.25, clean_rows =True ): 
         ''' All in one, cleaning data

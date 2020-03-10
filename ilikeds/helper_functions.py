@@ -19,7 +19,8 @@ action_dic ={
     5:  'split',
     6:  'drop: same quartile distribution',    
     7:  'outlier: remap',        
-    8:  'drop: outlier check',            
+    8:  'drop: outlier check',
+    9:  'drop: too many distinct value',    
 }
 
 def split_dataset(df, threshold=0.25):

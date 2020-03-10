@@ -255,7 +255,9 @@ class EDA(object):
 
             MAX = self.data[x].max()   
             MIN = self.data[x].min()
-            print(f'{x}: TOP_WHIS={TOP_WHIS}, DOWN_WHIS={DOWN_WHIS}, MAX={MAX}, MIN={MIN}')            
+            MEDIAN = self.data[x].median()
+
+            # print(f'{x}: TOP_WHIS={TOP_WHIS}, DOWN_WHIS={DOWN_WHIS}, MAX={MAX}, MIN={MIN}')            
 
             outlier_map = { 
                     x:    {
@@ -263,7 +265,7 @@ class EDA(object):
                         'MIN': MIN if DOWN_WHIS <  MIN else DOWN_WHIS,
                         },
                     }
-                    
+
             return outlier_map
 
         def remove_outliers(x):
@@ -289,13 +291,16 @@ class EDA(object):
         Returns: None
         '''            
 
-        # Delete undefined, multiple missing values and duplicate features
+        # # Delete undefined, multiple missing values and duplicate features
         print(f'Step 1: Delete undefined, multiple missing values and duplicate features ...')
         print(f'Before cleaning, Number of columns is {self.data.shape[1]} in {self.label} ')
-        feats_todrop = pd.read_csv('feats_dropped.csv', header=None)        
-        feats_todrop = pd.DataFrame(feats_todrop)[0].values.tolist()
-        self.data.drop(columns= feats_todrop, axis = 1,inplace =True)
-        print(f'After cleaning, Number of columns is {self.data.shape[1]} in {self.label} ')        
+        feats_todrop = pd.read_csv('feats_dropped.csv', names=['feat'])   
+        feats_todrop.set_index('feat', inplace=True)
+        feats_todrop.drop(['CAMEO_INTL_2015','EINGEFUEGT_AM','LP_LEBENSPHASE_GROB','PRAEGENDE_JUGENDJAHRE'],inplace=True)
+        # feats_todrop = pd.DataFrame(feats_todrop)[0].values.tolist()
+        self.data.drop(columns= feats_todrop.index, axis = 1,inplace =True)
+        self.feat_info.loc[feats_todrop.index, 'is_drop'] = 1
+        print(f'After cleaning, Number of columns is {self.data.shape[1]} in {self.label} ')     
 
         #  Convert missing and unknow values
         print(f'Step 2: Convert missing and unknow values ...')
@@ -314,10 +319,10 @@ class EDA(object):
 
 
         print(f'Step 4: Re-encoding features...')        
-        feats_encoding = ['OST_WEST_KZ',
-                          'CAMEO_DEUG_2015',
-                          'CAMEO_INTL_2015',
-                          'EINGEFUEGT_AM']
+        feats_encoding = [
+            'OST_WEST_KZ',
+            'CAMEO_DEUG_2015',
+            'CAMEO_INTL_2015']
 
         for x in feats_encoding:
             print(f'   Re-encoding: {x} ...')                           
@@ -325,7 +330,7 @@ class EDA(object):
 
         # Split mixed features
         print(f'Step 5: Split mixed features ...')
-        mixed_feats = ['CAMEO_INTL_2015', 'LP_LEBENSPHASE_GROB', 'PRAEGENDE_JUGENDJAHRE']
+        mixed_feats = self.feat_info[(self.feat_info.type == 'mixed') & (self.feat_info.is_drop == 0)].index
         for x in mixed_feats:
             print(f'   Spliting: {x} ...')                           
             self.split_mixed_feat(x)
@@ -338,18 +343,23 @@ class EDA(object):
                          'PRAEGENDE_JUGENDJAHRE_SPLIT_DECADE',
                          'PRAEGENDE_JUGENDJAHRE_SPLIT_MOVEMENT']
 
-        feat_info_split = self.build_split_feat_info(feats_splited)   
+        feats_splited_info = pd.DataFrame({
+            'type': pd.Series('categorical', index = feats_splited),
+            'unknow': pd.Series('[]', index = feats_splited)},
+            index = feats_splited)                         
+
+        feat_info_split = self.build_feat_info(feats_splited_info)   
         self.feat_info= pd.concat([self.feat_info, feat_info_split], sort = False)
 
         self.update_stats()
 
         print(f'Step 6: Handling outliers ...')  
-        outlier_feats = ['MIN_GEBAEUDEJAHR', 'EINGEZOGENAM_HH_JAHR']      
+        outlier_feats = self.feat_info[self.feat_info.is_drop == 0].index
         self.clean_outlier(outlier_feats)
 
         # Estimating NaN values with median
         print(f'Step 7: Estimating NaN values with median ...')                
-        imputer = Imputer(strategy='median')
+        imputer = Imputer(strategy='most_frequent')
         self.data_imputed = pd.DataFrame(imputer.fit_transform(self.data),  columns=self.data.columns)
 
         print(f'Step 8: Feature scaling ...')                        

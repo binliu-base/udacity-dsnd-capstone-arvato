@@ -18,7 +18,8 @@ action_dic ={
     4:  're-encoding: logarithmic scaling',        
     5:  'split',
     6:  'drop: same quartile distribution',    
-    7:  'remove-outlier',        
+    7:  'outlier: remap',        
+    8:  'drop: outlier check',            
 }
 
 def split_dataset(df, threshold=0.25):
@@ -105,6 +106,47 @@ def plot_boxplot(data, feats, n_cols= 3, figsize= (20,  6)):
                 break
 
     plt.subplots_adjust(hspace= 0.5)
+
+# def plot_boxplot_2feat_comparison(eda1, eda2, feats, figsize= (20,  6)):
+def plot_boxplot_comparison_2eda(eda1, eda2, feats, figsize= (20,  6), hspace=0.5):    
+    """ Draw a box plot to show distributions with respect to features.
+
+    Args:
+    - eda1:  eda object 
+    - eda2:  eda object 
+    - feats: a list of features for plotting
+    - figsize: Size of the figure
+
+    Returns: None
+    """
+    fig = plt.figure(figsize= figsize) 
+    n_rows = len(feats)
+    count = (x +1 for x in range(2*n_rows))    
+    for f in feats :
+        fig.add_subplot(n_rows, 2, next(count))
+        sns.boxplot(x = eda1.data[f])    
+        plt.title(f'Quartile distribution for: {f} in {eda1}')                            
+        
+        fig.add_subplot(n_rows, 2, next(count))
+        sns.boxplot(x = eda2.data[f])    
+        plt.title(f'Quartile distribution for: {f} in {eda2}')                            
+    plt.subplots_adjust(hspace= hspace)    
+
+def plot_boxplot_comparison(df_b, df_a,feats,figsize= (20,  6), hspace= 0.5):    
+
+    fig = plt.figure(figsize= figsize) 
+    n_rows = len(feats)
+    count = (x +1 for x in range(2*n_rows))    
+    for f in feats :
+        fig.add_subplot(n_rows, 2, next(count))
+        sns.boxplot(x = df_b[f])    
+        plt.title(f'Before: Quartile distribution of {f}')                            
+        
+        fig.add_subplot(n_rows, 2, next(count))
+        sns.boxplot(x = df_a[f]) 
+        plt.title(f'After: Quartile distribution of {f}') 
+
+    plt.subplots_adjust(hspace= hspace)    
 
 
 def do_pca(eda, n_components):

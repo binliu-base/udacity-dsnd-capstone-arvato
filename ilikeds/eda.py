@@ -248,52 +248,32 @@ class EDA(object):
         Returns: None
         '''                   
 
-        def make_outlier_map():  
+        def make_outlier_map(x):  
 
-            # numeric features
-            MIN_GEBAEUDEJAHR_MIN = self.feat_info.loc['MIN_GEBAEUDEJAHR'].value_Q1 - 5
-            MIN_GEBAEUDEJAHR_MAX = self.feat_info.loc['MIN_GEBAEUDEJAHR'].value_Q3 + 5
+            TOP_WHIS  = self.feat_info.loc[x].value_Q3 + 1.5*self.feat_info.loc[x].value_IRQ 
+            DOWN_WHIS = self.feat_info.loc[x].value_Q1 - 1.5*self.feat_info.loc[x].value_IRQ
 
-            EINGEZOGENAM_HH_JAHR_MIN = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_Q1 - self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_IRQ
-            EINGEZOGENAM_HH_JAHR_MAX = self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_Q3 + self.feat_info.loc['EINGEZOGENAM_HH_JAHR'].value_IRQ
-
-            ANZ_HAUSHALTE_AKTIV_MIN = self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_Q1 - self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_IRQ
-            ANZ_HAUSHALTE_AKTIV_MAX = self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_Q3 + self.feat_info.loc['ANZ_HAUSHALTE_AKTIV'].value_IRQ    
-
-            ANZ_PERSONEN_MIN = self.feat_info.loc['ANZ_PERSONEN'].value_Q1 - self.feat_info.loc['ANZ_PERSONEN'].value_IRQ
-            ANZ_PERSONEN_MAX = self.feat_info.loc['ANZ_PERSONEN'].value_Q3 + self.feat_info.loc['ANZ_PERSONEN'].value_IRQ     
-
-            KBA13_ANZAHL_PKW_MIN = self.feat_info.loc['KBA13_ANZAHL_PKW'].value_Q1 - self.feat_info.loc['KBA13_ANZAHL_PKW'].value_IRQ
-            KBA13_ANZAHL_PKW_MAX = self.feat_info.loc['KBA13_ANZAHL_PKW'].value_Q3 + self.feat_info.loc['KBA13_ANZAHL_PKW'].value_IRQ                           
-
-            # categorical features
-            # CAMEO_DEU_2015_MIN = self.feat_info.loc['CAMEO_DEU_2015'].Q1 - self.feat_info.loc['CAMEO_DEU_2015'].IQR
-            # CAMEO_DEU_2015_MAX = self.feat_info.loc['CAMEO_DEU_2015'].Q3 + self.feat_info.loc['CAMEO_DEU_2015'].IQR            
-
-            D19_KONSUMTYP_MIN =  self.feat_info.loc['D19_KONSUMTYP'].value_Q1 - self.feat_info.loc['D19_KONSUMTYP'].value_IRQ
-            D19_KONSUMTYP_MAX =  self.feat_info.loc['D19_KONSUMTYP'].value_Q3 + self.feat_info.loc['D19_KONSUMTYP'].value_IRQ
+            MAX = self.data[x].max()   
+            MIN = self.data[x].min()
+            print(f'{x}: TOP_WHIS={TOP_WHIS}, DOWN_WHIS={DOWN_WHIS}, MAX={MAX}, MIN={MIN}')            
 
             outlier_map = { 
-                    'MIN_GEBAEUDEJAHR':  {'MIN': MIN_GEBAEUDEJAHR_MIN ,  'MAX': MIN_GEBAEUDEJAHR_MAX},
-                    'EINGEZOGENAM_HH_JAHR':    {'MIN': EINGEZOGENAM_HH_JAHR_MIN, 'MAX': EINGEZOGENAM_HH_JAHR_MAX},
-                    'ANZ_HAUSHALTE_AKTIV':    {'MIN': ANZ_HAUSHALTE_AKTIV_MIN, 'MAX': ANZ_HAUSHALTE_AKTIV_MAX},                    
-                    'ANZ_PERSONEN':    {'MIN': ANZ_PERSONEN_MIN, 'MAX': ANZ_PERSONEN_MAX},                                        
-                    'KBA13_ANZAHL_PKW':    {'MIN': KBA13_ANZAHL_PKW_MIN, 'MAX': KBA13_ANZAHL_PKW_MAX},                                                            
-                    # 'CAMEO_DEU_2015':  {'MIN': CAMEO_DEU_2015_MIN,  'MAX': CAMEO_DEU_2015_MAX},
-                    'D19_KONSUMTYP':    {'MIN': D19_KONSUMTYP_MIN, 'MAX': D19_KONSUMTYP_MAX},
+                    x:    {
+                        'MAX': MAX if TOP_WHIS  >  MAX else TOP_WHIS,
+                        'MIN': MIN if DOWN_WHIS <  MIN else DOWN_WHIS,
+                        },
                     }
-
+                    
             return outlier_map
 
         def remove_outliers(x):
-            lim=outlier_map[x]
-            if 'MIN' in lim.keys():
-                self.data[x] = self.data[x].fillna( self.data[x].mean()).apply(lambda k: lim['MIN'] if k < lim['MIN'] else k)
 
-            if 'MAX' in lim.keys():
-                self.data[x] = self.data[x].fillna( self.data[x].mean()).apply(lambda k: lim['MAX'] if k > lim['MAX'] else k) 
+            outlier_map = make_outlier_map(x)
 
-        outlier_map = make_outlier_map()                
+            lim = outlier_map[x] 
+            # print(f'lim = {lim}')
+            self.data.loc[self.data[x] < lim['MIN'], [x]] =  lim['MIN']
+            self.data.loc[self.data[x] > lim['MAX'], [x]] =  lim['MAX']            
 
         for x in feats:
             print(f'Cleaning outliers for {x}  ...')            

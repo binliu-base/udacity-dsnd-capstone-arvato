@@ -21,6 +21,7 @@ action_dic ={
     7:  'outlier: remap',        
     8:  'drop: outlier check',
     9:  'drop: too many distinct value',    
+    10: 'drop: due to collinear above threshold',        
 }
 
 def split_dataset(df, threshold=0.25):
@@ -50,19 +51,19 @@ def split_date(p_data, p_column = 'EINGEFUEGT_AM', p_newColName = None):
 
     p_data[f'{v_new}_Year']           = p_data[p_column].dt.year # The year of the datetime
     p_data[f'{v_new}_Month']          = p_data[p_column].dt.month # The month as January=1, December=12
-    p_data[f'{v_new}_Day']            = p_data[p_column].dt.day # The day of the datetime
-    p_data[f'{v_new}_Quarter']        = p_data[p_column].dt.quarter # The quarter of the date
-    p_data[f'{v_new}_DaysInMonth']    = p_data[p_column].dt.days_in_month # The number of days in the month
-    p_data[f'{v_new}_IsMonthStart']   = p_data[p_column].dt.is_month_start.apply(lambda x: 1 if x else 0)   # Flag for first day of month
-    p_data[f'{v_new}_IsMonthEnd']     = p_data[p_column].dt.is_month_end.apply(lambda x: 1 if x else 0)     # Flag for last day of the month
-    p_data[f'{v_new}_IsQuarterStart'] = p_data[p_column].dt.is_quarter_start.apply(lambda x: 1 if x else 0) # Flag for first day of a quarter
-    p_data[f'{v_new}_IsQuarterEnd']   = p_data[p_column].dt.is_quarter_end.apply(lambda x: 1 if x else 0)   # Flag for last day of a quarter
-    p_data[f'{v_new}_IsYearStart']    = p_data[p_column].dt.is_year_start.apply(lambda x: 1 if x else 0)    # Flag for first day of a year
-    p_data[f'{v_new}_IsYearEnd']      = p_data[p_column].dt.is_year_end.apply(lambda x: 1 if x else 0)      # Flag for last day of a year    
-    p_data[f'{v_new}_Season']         = p_data[f'{v_new}_Month'].apply(lambda x:      0 if x in [1, 2, 12] # 'winter'
-                                                                                 else 1 if x in [3, 4, 5]  # 'spring'
-                                                                                 else 2 if x in [6, 7, 8]  # 'summer'
-                                                                                 else 3 )                  # 'fall'    
+    # p_data[f'{v_new}_Day']            = p_data[p_column].dt.day # The day of the datetime
+    # p_data[f'{v_new}_Quarter']        = p_data[p_column].dt.quarter # The quarter of the date
+    # p_data[f'{v_new}_DaysInMonth']    = p_data[p_column].dt.days_in_month # The number of days in the month
+    # p_data[f'{v_new}_IsMonthStart']   = p_data[p_column].dt.is_month_start.apply(lambda x: 1 if x else 0)   # Flag for first day of month
+    # p_data[f'{v_new}_IsMonthEnd']     = p_data[p_column].dt.is_month_end.apply(lambda x: 1 if x else 0)     # Flag for last day of the month
+    # p_data[f'{v_new}_IsQuarterStart'] = p_data[p_column].dt.is_quarter_start.apply(lambda x: 1 if x else 0) # Flag for first day of a quarter
+    # p_data[f'{v_new}_IsQuarterEnd']   = p_data[p_column].dt.is_quarter_end.apply(lambda x: 1 if x else 0)   # Flag for last day of a quarter
+    # p_data[f'{v_new}_IsYearStart']    = p_data[p_column].dt.is_year_start.apply(lambda x: 1 if x else 0)    # Flag for first day of a year
+    # p_data[f'{v_new}_IsYearEnd']      = p_data[p_column].dt.is_year_end.apply(lambda x: 1 if x else 0)      # Flag for last day of a year    
+    # p_data[f'{v_new}_Season']         = p_data[f'{v_new}_Month'].apply(lambda x:      0 if x in [1, 2, 12] # 'winter'
+    #                                                                              else 1 if x in [3, 4, 5]  # 'spring'
+    #                                                                              else 2 if x in [6, 7, 8]  # 'summer'
+    #                                                                              else 3 )                  # 'fall'    
 
 def check_features(eda, feat_type='categorical'):
     """  Access features of a specific type.
@@ -334,8 +335,7 @@ def plot_cluster_comparison(preds_c, preds_a):
     print()    
     counts_a = prepare_data(preds_a, 'Azdias')
 
-    frame = [counts_c, counts_a]
-    result_df = pd.concat(frame, keys = ['cluster', 'count', 'percent'], axis = 0)
+    result_df = pd.concat( [counts_c, counts_a], keys = ['cluster', 'count', 'percent'], axis = 0)
     
     ax = sns.catplot( x = 'cluster',y = 'percent', data= result_df,
                     hue = 'type',
@@ -351,19 +351,19 @@ def plot_cluster_comparison(preds_c, preds_a):
     
     return counts_c, counts_a
 
-def list_component(eda, top_n_comps):
+def list_component(eda, comp_id, top_n):
     """ Listing the top N and the bottom N features of a given component
     Args: 
         eda - EDA object instance        
-        top_n_comps            
+
     Returns: None
 
     """    
     listing = pd.DataFrame({
                         'Features':list(eda.data.columns),
-                        'Weights':eda.pca.components_[top_n_comps]}).sort_values('Weights', axis=0, ascending=False).values.tolist()
+                        'Weights':eda.pca.components_[comp_id]}).sort_values('Weights', axis=0, ascending=False).values.tolist()
 
-    return listing[:5]+['^^^HEAD','TAILvvv']+listing[-5:]  
+    return listing[:top_n]+['^^^HEAD','TAILvvv']+listing[-top_n:]   
 
 
 def build_roc_auc(model_dict, param_grid, X_train, y_train):
